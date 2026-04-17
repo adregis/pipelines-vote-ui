@@ -1,0 +1,61 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: vote-ui-pipeline
+  namespace: pipeline-hml
+spec:
+  workspaces:
+    - name: shared-data
+  tasks:
+    - name: fetch-repo
+      taskRef:
+        # Usando o Resolver para buscar a task oficial do catálogo
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: git-clone
+          - name: namespace
+            value: openshift-pipelines # Namespace padrão onde o operator instala as tasks
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: https://github.com/adregis/pipelines-vote-ui
+        - name: revision
+          value: main
+
+    - name: build-image
+      runAfter: ["fetch-repo"]
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/vote-ui/app:latest
+        - name: TLSVERIFY
+          value: "false"
+    
+    - name: update-gitops
+      runAfter: ["build-image"] # Só roda se o build der certo
+      taskRef:
+        name: git-update-manifest # Referência à Task local que criamos acima
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE_TAG
+          value: "latest" # Aqui você pode usar variáveis de data ou commit futuramente
+        - name: MANIFEST_PATH
+          value: "gitops/deployment.yaml"

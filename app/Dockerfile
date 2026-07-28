@@ -6,6 +6,10 @@ FROM image-registry.openshift-image-registry.svc:5000/openshift/python:latest
 ADD requirements.txt /opt/app-root/src/requirements.txt
 RUN pip install -r requirements.txt
 
+# --- COPIA OS ARQUIVOS E O DIRETÓRIO DE TEMPLATES ---
+ADD app.py /opt/app-root/src/app.py
+ADD templates /opt/app-root/src/templates
+
 # Copy our code from the current folder to /app inside the container
 ADD . /opt/app-root/src
 

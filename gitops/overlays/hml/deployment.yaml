@@ -4,6 +4,7 @@ metadata:
   labels:
     app: pipelines-vote-ui
   name: pipelines-vote-ui
+  namespace: app-vote
 spec:
   replicas: 1
   selector:

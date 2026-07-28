@@ -1,21 +1,12 @@
-# Using official python runtime base image
 FROM image-registry.openshift-image-registry.svc:5000/openshift/python:latest
-#FROM python:3.13.9
 
-# Install our requirements.txt
+# Instala as dependências primeiro para aproveitar o cache de camadas
 ADD requirements.txt /opt/app-root/src/requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install -r /opt/app-root/src/requirements.txt
 
-# --- COPIA OS ARQUIVOS E O DIRETÓRIO DE TEMPLATES ---
-ADD app.py /opt/app-root/src/app.py
-ADD templates /opt/app-root/src/templates
-
-# Copy our code from the current folder to /app inside the container
+# Copia todo o conteúdo da pasta atual para o container
 ADD . /opt/app-root/src
 
-# Make port 80 available for links and/or publish
 EXPOSE 8080
 
-# Define our command to be run when launching the container
-#CMD ["gunicorn", "app:app", "-b", "0.0.0.0:8080", "--log-file", "-", "--access-logfile", "-", "--workers", "4", "--keep-alive", "0"]
 CMD ["python", "./app.py"]

@@ -1,0 +1,70 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-update-manifest
+  namespace: pipelines-tutorial
+spec:
+  params:
+    - name: git-config-repo
+      type: string
+    - name: app-name
+      type: string
+    - name: image-tag
+      type: string
+    - name: environment      # <--- NOVO PARÂMETRO
+      type: string
+      default: "dev"
+    - name: git-user-email
+      type: string
+      default: "tekton-ci@openshift.local"
+    - name: git-user-name
+      type: string
+      default: "Tekton Bot"
+  workspaces:
+    - name: source
+  steps:
+    - name: update-and-push
+      image: alpine/git:latest
+      workingDir: $(workspaces.source.path)
+      env:
+        - name: GIT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: git-credentials
+              key: token
+              optional: true
+      script: |
+        #!/usr/bin/env sh
+        set -e
+        REPO_URL="$(params.git-config-repo)"
+        if [ -n "$GIT_TOKEN" ]; then
+          CLEAN_URL=$(echo "$REPO_URL" | sed 's|https://||')
+          AUTH_REPO_URL="https://${GIT_TOKEN}@${CLEAN_URL}"
+        else
+          AUTH_REPO_URL="$REPO_URL"
+        fi
+
+        rm -rf vote-app-config
+        git clone "$AUTH_REPO_URL" vote-app-config
+        cd vote-app-config
+        git config user.email "$(params.git-user-email)"
+        git config user.name "$(params.git-user-name)"
+
+        # ---> INCLUI O AMBIENTE NO CAMINHO <---
+        if [ "$(params.app-name)" = "pipelines-vote-ui" ]; then
+          MANIFEST_PATH="k8s/$(params.environment)/ui/deployment.yaml"
+        else
+          MANIFEST_PATH="k8s/$(params.environment)/api/deployment.yaml"
+        fi
+
+        echo "Atualizando ambiente $(params.environment) em $MANIFEST_PATH..."
+        sed -i "s|image: .*|image: $(params.image-tag)|g" $MANIFEST_PATH
+
+        if git diff --quiet; then
+          echo "Nenhuma alteracao detectada."
+        else
+          git add $MANIFEST_PATH
+          git commit -m "chore(ci): update $(params.app-name) in $(params.environment) to $(params.image-tag) [skip ci]"
+          git push origin HEAD:main || git push origin HEAD:master
+          echo "Manifesto de $(params.environment) atualizado no GitOps!"
+        fi

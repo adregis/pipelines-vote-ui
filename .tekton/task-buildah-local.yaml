@@ -1,0 +1,46 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah-local
+spec:
+  description: Task local ajustada para resolver o registry interno via DNS do cluster
+  params:
+    - name: IMAGE
+      type: string
+    - name: CONTEXT_DIR
+      type: string
+      default: "."
+    - name: DOCKERFILE
+      type: string
+      default: "Dockerfile"
+  workspaces:
+    - name: source
+  steps:
+    - name: build-and-push
+      image: registry.redhat.io/rhel8/buildah:latest
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        capabilities:
+          add: ["SETFCAP"]
+      command: ["/bin/bash", "-c"]
+      args:
+        - |-
+          export STORAGE_DRIVER=vfs
+          export BUILDAH_ISOLATION=chroot
+          
+          # Autenticacao com a ServiceAccount do Pipeline no Registry do OpenShift
+          if [ -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
+            buildah login --storage-driver=vfs --tls-verify=false \
+              -u serviceaccount \
+              -p $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) \
+              image-registry.openshift-image-registry.svc:5000
+          fi
+          
+          # Entra no diretório de contexto do projeto (ex: app)
+          cd $(params.CONTEXT_DIR)
+          
+          echo "Iniciando build no diretório: $(pwd)..."
+          buildah bud --storage-driver=vfs --isolation=chroot --tls-verify=false -f $(params.DOCKERFILE) -t $(params.IMAGE) .
+          
+          echo "Enviando imagem para o registro..."
+          buildah push --storage-driver=vfs --tls-verify=false $(params.IMAGE) docker://$(params.IMAGE)

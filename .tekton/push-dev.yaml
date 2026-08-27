@@ -27,9 +27,9 @@ spec:
           - name: output
             workspace: shared-workspace
         params:
-          - name: url
+          - name: URL
             value: "{{ repo_url }}"
-          - name: revision
+          - name: REVISION
             value: "{{ revision }}"
 
       - name: run-tests

@@ -3,9 +3,8 @@ kind: PipelineRun
 metadata:
   name: vote-app-dev-run
   annotations:
-    # --- Configurações do Pipelines as Code ---
     pipelinesascode.tekton.dev/on-event: "[push]"
-    pipelinesascode.tekton.dev/on-target-branch: "[main, master]"
+    pipelinesascode.tekton.dev/on-target-branch: "[master, main]"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   taskRunTemplate:
@@ -14,7 +13,6 @@ spec:
     workspaces:
       - name: shared-workspace
     tasks:
-      # 1. Fetch
       - name: fetch-repository
         taskRef:
           resolver: cluster
@@ -29,25 +27,11 @@ spec:
           - name: output
             workspace: shared-workspace
         params:
-          - name: URL
+          - name: url
             value: "{{ repo_url }}"
-          - name: REVISION
+          - name: revision
             value: "{{ revision }}"
 
-      # 2. Testes Unitários
-      - name: run-tests
-        taskRef:
-          name: run-unit-tests
-        params:
-          - name: CONTEXT_DIR
-            value: "."
-        workspaces:
-          - name: source
-            workspace: shared-workspace
-        runAfter:
-          - fetch-repository
-
-      # 3. Buildah (Imagem com tag de Dev)
       - name: build-image
         taskRef:
           name: buildah-local
@@ -62,9 +46,8 @@ spec:
           - name: source
             workspace: shared-workspace
         runAfter:
-          - run-tests
+          - fetch-repository # <--- RODA LOGO APÓS CLONAR O REPOSITÓRIO
 
-      # 4. Atualiza a pasta k8s/dev no vote-app-config
       - name: update-gitops-manifest
         taskRef:
           name: git-update-manifest

@@ -6,6 +6,8 @@ metadata:
     pipelinesascode.tekton.dev/on-event: "[push]"
     pipelinesascode.tekton.dev/on-target-branch: "[master, main]"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
+    # Mapeia as Tasks locais para o PaC resolver automaticamente:
+    pipelinesascode.tekton.dev/task: "[run-unit-tests, buildah-local, git-update-manifest]"
 spec:
   taskRunTemplate:
     serviceAccountName: pipeline
@@ -32,6 +34,18 @@ spec:
           - name: revision
             value: "{{ revision }}"
 
+      - name: run-tests
+        taskRef:
+          name: run-unit-tests
+        params:
+          - name: CONTEXT_DIR
+            value: "."
+        workspaces:
+          - name: source
+            workspace: shared-workspace
+        runAfter:
+          - fetch-repository
+
       - name: build-image
         taskRef:
           name: buildah-local
@@ -46,7 +60,7 @@ spec:
           - name: source
             workspace: shared-workspace
         runAfter:
-          - fetch-repository # <--- RODA LOGO APÓS CLONAR O REPOSITÓRIO
+          - run-tests
 
       - name: update-gitops-manifest
         taskRef:

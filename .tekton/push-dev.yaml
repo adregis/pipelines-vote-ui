@@ -6,8 +6,6 @@ metadata:
     pipelinesascode.tekton.dev/on-event: "[push]"
     pipelinesascode.tekton.dev/on-target-branch: "[master, main]"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
-    # Mapeia as Tasks locais para o PaC resolver automaticamente:
-    pipelinesascode.tekton.dev/task: "[run-unit-tests, buildah-local, git-update-manifest]"
 spec:
   taskRunTemplate:
     serviceAccountName: pipeline
@@ -36,7 +34,14 @@ spec:
 
       - name: run-tests
         taskRef:
-          name: run-unit-tests
+          resolver: cluster
+          params:
+            - name: kind
+              value: task
+            - name: name
+              value: run-unit-tests
+            - name: namespace
+              value: pipelines-tutorial
         params:
           - name: CONTEXT_DIR
             value: "."
@@ -48,7 +53,14 @@ spec:
 
       - name: build-image
         taskRef:
-          name: buildah-local
+          resolver: cluster
+          params:
+            - name: kind
+              value: task
+            - name: name
+              value: buildah-local
+            - name: namespace
+              value: pipelines-tutorial
         params:
           - name: IMAGE
             value: "image-registry.openshift-image-registry.svc:5000/pipelines-tutorial/{{ repo_name }}:{{ revision }}"
@@ -64,7 +76,14 @@ spec:
 
       - name: update-gitops-manifest
         taskRef:
-          name: git-update-manifest
+          resolver: cluster
+          params:
+            - name: kind
+              value: task
+            - name: name
+              value: git-update-manifest
+            - name: namespace
+              value: pipelines-tutorial
         params:
           - name: git-config-repo
             value: "https://github.com/adregis/vote-app-config.git"

@@ -1,0 +1,94 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: vote-app-dev-run
+  annotations:
+    # --- Configurações do Pipelines as Code ---
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[main, master]"
+    pipelinesascode.tekton.dev/max-keep-runs: "5"
+spec:
+  taskRunTemplate:
+    serviceAccountName: pipeline
+  pipelineSpec:
+    workspaces:
+      - name: shared-workspace
+    tasks:
+      # 1. Fetch
+      - name: fetch-repository
+        taskRef:
+          resolver: cluster
+          params:
+            - name: kind
+              value: task
+            - name: name
+              value: git-clone
+            - name: namespace
+              value: openshift-pipelines
+        workspaces:
+          - name: output
+            workspace: shared-workspace
+        params:
+          - name: URL
+            value: "{{ repo_url }}"
+          - name: REVISION
+            value: "{{ revision }}"
+
+      # 2. Testes Unitários
+      - name: run-tests
+        taskRef:
+          name: run-unit-tests
+        params:
+          - name: CONTEXT_DIR
+            value: "."
+        workspaces:
+          - name: source
+            workspace: shared-workspace
+        runAfter:
+          - fetch-repository
+
+      # 3. Buildah (Imagem com tag de Dev)
+      - name: build-image
+        taskRef:
+          name: buildah-local
+        params:
+          - name: IMAGE
+            value: "image-registry.openshift-image-registry.svc:5000/pipelines-tutorial/{{ repo_name }}:{{ revision }}"
+          - name: CONTEXT_DIR
+            value: "."
+          - name: DOCKERFILE
+            value: "Dockerfile"
+        workspaces:
+          - name: source
+            workspace: shared-workspace
+        runAfter:
+          - run-tests
+
+      # 4. Atualiza a pasta k8s/dev no vote-app-config
+      - name: update-gitops-manifest
+        taskRef:
+          name: git-update-manifest
+        params:
+          - name: git-config-repo
+            value: "https://github.com/adregis/vote-app-config.git"
+          - name: environment
+            value: "dev"
+          - name: app-name
+            value: "{{ repo_name }}"
+          - name: image-tag
+            value: "image-registry.openshift-image-registry.svc:5000/pipelines-tutorial/{{ repo_name }}:{{ revision }}"
+        workspaces:
+          - name: source
+            workspace: shared-workspace
+        runAfter:
+          - build-image
+
+  workspaces:
+    - name: shared-workspace
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

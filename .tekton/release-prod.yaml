@@ -38,7 +38,7 @@ spec:
           name: run-unit-tests
         params:
           - name: CONTEXT_DIR
-            value: "app"
+            value: "."
         workspaces:
           - name: source
             workspace: shared-workspace
@@ -52,7 +52,7 @@ spec:
           - name: IMAGE
             value: "image-registry.openshift-image-registry.svc:5000/pipelines-tutorial/{{ repo_name }}:{{ revision }}"
           - name: CONTEXT_DIR
-            value: "."
+            value: "app"
           - name: DOCKERFILE
             value: "Dockerfile"
         workspaces:

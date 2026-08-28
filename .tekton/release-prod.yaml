@@ -38,7 +38,7 @@ spec:
           name: run-unit-tests
         params:
           - name: CONTEXT_DIR
-            value: "."
+            value: "app"
         workspaces:
           - name: source
             workspace: shared-workspace
